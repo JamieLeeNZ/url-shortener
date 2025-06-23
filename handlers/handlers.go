@@ -91,3 +91,9 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, original, http.StatusFound)
 }
+
+func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"status": "OK"}
+	json.NewEncoder(w).Encode(response)
+}

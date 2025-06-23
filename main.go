@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -14,9 +13,7 @@ func main() {
 
 	s := handlers.NewServer(memStore)
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "OK")
-	})
+	http.HandleFunc("/health", s.HealthHandler)
 
 	http.HandleFunc("/shorten", s.ShortenHandler)
 
