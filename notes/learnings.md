@@ -145,3 +145,40 @@ func (p Person) Greet() string {
   ```
 
 - `RWMutex` improves performance by allowing concurrent reads while still protecting writes.
+
+## 7. Handlers
+
+- Handlers in Go are functions that process HTTP requests and write HTTP responses.
+- Handlers have the following signature:
+  ```go
+  func(w http.ResponseWriter, r *http.Request)
+  ```
+  where `http.ResponseWriter` is used to construct the HTTP response, and `*http.Request` contains the incoming request data.
+- Handlers can be registered with the HTTP server as:
+
+  - Standalone functions:
+    ```go
+    http.HandleFunc("/path", handlerFunction)
+    ```
+  - Methods of a struct:
+    ```go
+    http.HandleFunc("/path", s.MethodName)
+    ```
+
+- Inside handlers:
+  - Parse and validate request data (e.g., decode JSON body with json.NewDecoder(r.Body).Decode(&struct))
+  - Validate input (e.g., check required fields, URL format)
+  - Perform business logic (e.g., check in-memory store, generate short keys)
+  - Write responses with status codes and JSON encoding (w.Header().Set, json.NewEncoder(w).Encode(...))
+
+## 8. HTTP Methods
+
+- Go's `net/http` package provides built-in support for handling HTTP methods like GET, POST, PUT, DELETE, etc.
+- Along with handlers, we can use:
+  - `http.Redirect` to redirect requests
+  - `http.Error` to send error responses with specific status codes
+  - `http.ListenAndServe` to start the HTTP server
+  - `http.ServeFile` to serve static files
+  - `http.MethodGET`, `http.MethodPost`, etc., to check request methods in handlers
+  - `http.StatusOK`, `http.StatusNotFound`, etc., for standard HTTP status codes
+  - `http.SetCookie` to set cookies in responses
