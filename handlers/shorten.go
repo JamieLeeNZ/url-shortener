@@ -54,12 +54,17 @@ func (s *Server) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := generateRandomKey(6)
-	for db.Contains(key) {
-		key = generateRandomKey(6)
-	}
+	var key string
 
-	db.Set(key, req.Original)
+	if k, found := db.GetKeyFromOriginal(req.Original); found {
+		key = k
+	} else {
+		key = generateRandomKey(6)
+		for db.ContainsKey(key) {
+			key = generateRandomKey(6)
+		}
+		db.Set(key, req.Original)
+	}
 
 	resp := models.URLShortenResponse{Key: key}
 	w.Header().Set("Content-Type", "application/json")
@@ -78,7 +83,7 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	original, ok := s.store.Get(key)
+	original, ok := s.store.GetOriginalFromKey(key)
 	if !ok {
 		http.Error(w, "Invalid URL.", http.StatusNotFound)
 		return
