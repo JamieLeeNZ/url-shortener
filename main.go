@@ -17,6 +17,8 @@ func main() {
 
 	http.HandleFunc("/shorten", s.ShortenHandler)
 
+	http.HandleFunc("/delete/", s.DeleteHandler)
+
 	http.HandleFunc("/", s.GetHandler)
 
 	port := ":8080"

@@ -97,3 +97,24 @@ func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{"status": "OK"}
 	json.NewEncoder(w).Encode(response)
 }
+
+func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "This is a DELETE method only.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	key := strings.TrimPrefix(r.URL.Path, "/delete/")
+	if key == "" {
+		http.Error(w, "URI required.", http.StatusBadRequest)
+		return
+	}
+
+	if !s.store.ContainsKey(key) {
+		http.Error(w, "Invalid URL.", http.StatusNotFound)
+		return
+	}
+
+	s.store.Delete(key)
+	w.WriteHeader(http.StatusNoContent)
+}

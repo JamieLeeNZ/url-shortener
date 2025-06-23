@@ -42,3 +42,12 @@ func (s *MemoryStore) ContainsKey(key string) bool {
 	_, ok := s.keyToOriginal[key]
 	return ok
 }
+
+func (s *MemoryStore) Delete(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if original, ok := s.keyToOriginal[key]; ok {
+		delete(s.keyToOriginal, key)
+		delete(s.originalToKey, original)
+	}
+}
