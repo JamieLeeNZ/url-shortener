@@ -26,7 +26,7 @@ func main() {
 		case http.MethodDelete:
 			s.DeleteHandler(w, r)
 		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 

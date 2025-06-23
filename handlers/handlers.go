@@ -39,7 +39,7 @@ func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "This is a POST method only.", http.StatusMethodNotAllowed)
+		http.Error(w, "this is a POST method only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -70,19 +70,19 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "This is a GET method only.", http.StatusMethodNotAllowed)
+		http.Error(w, "this is a GET method only", http.StatusMethodNotAllowed)
 		return
 	}
 
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
-		http.Error(w, "URI required.", http.StatusBadRequest)
+		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
 	original, ok := s.store.GetOriginalFromKey(key)
 	if !ok {
-		http.Error(w, "Invalid URL.", http.StatusNotFound)
+		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
 	}
 
@@ -91,13 +91,13 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "This is a PUT method only.", http.StatusMethodNotAllowed)
+		http.Error(w, "this is a PUT method only", http.StatusMethodNotAllowed)
 		return
 	}
 
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
-		http.Error(w, "URI required.", http.StatusBadRequest)
+		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	success := s.store.Update(key, req.Original)
 	if !success {
-		http.Error(w, "Key not found or new URL already mapped to a different key", http.StatusNotFound)
+		http.Error(w, "key not found or new URL already mapped to a different key", http.StatusNotFound)
 		return
 	}
 
@@ -119,18 +119,18 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "This is a DELETE method only.", http.StatusMethodNotAllowed)
+		http.Error(w, "this is a DELETE method only", http.StatusMethodNotAllowed)
 		return
 	}
 
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
-		http.Error(w, "URI required.", http.StatusBadRequest)
+		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
 	if !s.store.ContainsKey(key) {
-		http.Error(w, "Invalid URL.", http.StatusNotFound)
+		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
 	}
 
