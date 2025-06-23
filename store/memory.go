@@ -43,6 +43,30 @@ func (s *MemoryStore) ContainsKey(key string) bool {
 	return ok
 }
 
+func (s *MemoryStore) Update(key, newValue string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	original, ok := s.keyToOriginal[key]
+	if !ok {
+		return false
+	}
+
+	if existingKey, exists := s.originalToKey[newValue]; exists && existingKey != key {
+		return false
+	}
+
+	if original == newValue {
+		return true
+	}
+
+	delete(s.originalToKey, original)
+	s.keyToOriginal[key] = newValue
+	s.originalToKey[newValue] = key
+
+	return true
+}
+
 func (s *MemoryStore) Delete(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

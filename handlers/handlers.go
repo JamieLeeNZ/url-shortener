@@ -43,25 +43,11 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.URLShortenRequest
 	db := s.store
 
-	err := json.NewDecoder(r.Body).Decode(&req)
+	req, err := parseAndValidateURL(r)
 	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	fmt.Println("Original URL:", req.Original)
-
-	if req.Original == "" {
-		http.Error(w, "Original URL is required", http.StatusBadRequest)
-		return
-	}
-
-	_, err = url.ParseRequestURI(req.Original)
-	if err != nil {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -103,6 +89,34 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, original, http.StatusFound)
 }
 
+func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "This is a PUT method only.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	key := strings.TrimPrefix(r.URL.Path, "/")
+	if key == "" {
+		http.Error(w, "URI required.", http.StatusBadRequest)
+		return
+	}
+
+	req, err := parseAndValidateURL(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	success := s.store.Update(key, req.Original)
+	if !success {
+		http.Error(w, "Key not found or new URL already mapped to a different key", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+
+}
+
 func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "This is a DELETE method only.", http.StatusMethodNotAllowed)
@@ -122,4 +136,23 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.store.Delete(key)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseAndValidateURL(r *http.Request) (models.URLShortenRequest, error) {
+	var req models.URLShortenRequest
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		return req, fmt.Errorf("invalid JSON")
+	}
+
+	if req.Original == "" {
+		return req, fmt.Errorf("original URL is required")
+	}
+
+	if _, err := url.ParseRequestURI(req.Original); err != nil {
+		return req, fmt.Errorf("invalid URL format")
+	}
+
+	return req, nil
 }

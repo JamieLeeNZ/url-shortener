@@ -21,6 +21,8 @@ func main() {
 			s.CreateHandler(w, r)
 		case http.MethodGet:
 			s.GetHandler(w, r)
+		case http.MethodPut:
+			s.UpdateHandler(w, r)
 		case http.MethodDelete:
 			s.DeleteHandler(w, r)
 		default:
