@@ -31,7 +31,18 @@ func generateRandomKey(length int) string {
 	return string(b)
 }
 
-func (s *Server) ShortenHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"status": "OK"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "This is a POST method only.", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var req models.URLShortenRequest
 	db := s.store
 
@@ -73,7 +84,7 @@ func (s *Server) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "This is a GET method only.", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -92,19 +103,13 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, original, http.StatusFound)
 }
 
-func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]string{"status": "OK"}
-	json.NewEncoder(w).Encode(response)
-}
-
 func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "This is a DELETE method only.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	key := strings.TrimPrefix(r.URL.Path, "/delete/")
+	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI required.", http.StatusBadRequest)
 		return

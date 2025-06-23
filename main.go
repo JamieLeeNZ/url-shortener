@@ -15,11 +15,18 @@ func main() {
 
 	http.HandleFunc("/health", s.HealthHandler)
 
-	http.HandleFunc("/shorten", s.ShortenHandler)
-
-	http.HandleFunc("/delete/", s.DeleteHandler)
-
-	http.HandleFunc("/", s.GetHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			s.CreateHandler(w, r)
+		case http.MethodGet:
+			s.GetHandler(w, r)
+		case http.MethodDelete:
+			s.DeleteHandler(w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	port := ":8080"
 	log.Printf("Starting server at http://localhost%s/health\n", port)
