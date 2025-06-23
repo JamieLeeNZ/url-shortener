@@ -20,6 +20,8 @@ func main() {
 
 	http.HandleFunc("/shorten", s.ShortenHandler)
 
+	http.HandleFunc("/", s.GetHandler)
+
 	port := ":8080"
 	log.Printf("Starting server at http://localhost%s/health\n", port)
 	if err := http.ListenAndServe(port, nil); err != nil {
