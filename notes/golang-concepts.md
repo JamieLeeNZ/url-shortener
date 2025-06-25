@@ -182,3 +182,21 @@ func (p Person) Greet() string {
   - `http.MethodGET`, `http.MethodPost`, etc., to check request methods in handlers
   - `http.StatusOK`, `http.StatusNotFound`, etc., for standard HTTP status codes
   - `http.SetCookie` to set cookies in responses
+
+## 9. Interfaces
+
+- Interfaces in Go define a set of methods that a type must implement, similar to Java interfaces.
+- Example:
+  ```go
+  type Store interface {
+      Set(key, value string)
+      Get(key string) (string, bool)
+  }
+  ```
+- In Go, we don't need to explicitly declare that a type implements an interface; it is implicit. If a type has all the methods defined in an interface, it implements that interface.
+- IMPORTANT: Interfaces are reference types, meaning they hold a pointer to the underlying data and the type information. We don't need to pass or use pointers (`*MyInterface`) to structs to implement interfaces, as Go automatically handles this (just use `MyInterface`).
+- Interfaces let us swap out implementations easily, allowing for flexible code design and testing.
+- To enforce that a struct implements an interface at compile time, add this line (usually near the top of the file where the struct is defined):
+  ```go
+  var _ Store = (*MemoryStore)(nil) // Ensures MemoryStore implements Store interface
+  ```
