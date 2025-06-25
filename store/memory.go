@@ -75,3 +75,8 @@ func (s *MemoryStore) Delete(key string) {
 		delete(s.originalToKey, original)
 	}
 }
+
+func (s *MemoryStore) Close() error {
+	// No resources to close in memory store
+	return nil
+}
