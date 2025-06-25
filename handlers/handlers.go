@@ -13,10 +13,10 @@ import (
 )
 
 type Server struct {
-	store *store.MemoryStore
+	store store.URLStore
 }
 
-func NewServer(db *store.MemoryStore) *Server {
+func NewServer(db store.URLStore) *Server {
 	return &Server{
 		store: db,
 	}

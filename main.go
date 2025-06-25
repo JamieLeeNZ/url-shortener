@@ -27,9 +27,7 @@ func main() {
 	}
 	defer postgresStore.Close()
 
-	memStore := store.NewMemoryStore()
-
-	s := handlers.NewServer(memStore)
+	s := handlers.NewServer(postgresStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
 
