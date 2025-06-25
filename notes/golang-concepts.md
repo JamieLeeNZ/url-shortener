@@ -1,4 +1,4 @@
-# Notes
+# Golang Concepts Notes
 
 These are my notes on the Go programming language, focusing on its unique features and how they differ from Java, as I build this project.
 
