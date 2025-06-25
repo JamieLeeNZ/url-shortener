@@ -15,11 +15,14 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) Set(key, value string) {
+var _ URLStore = (*MemoryStore)(nil)
+
+func (s *MemoryStore) Set(key, originalURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.keyToOriginal[key] = value
-	s.originalToKey[value] = key
+	s.keyToOriginal[key] = originalURL
+	s.originalToKey[originalURL] = key
+	return nil
 }
 
 func (s *MemoryStore) GetOriginalFromKey(key string) (string, bool) {
@@ -67,13 +70,15 @@ func (s *MemoryStore) Update(key, newValue string) bool {
 	return true
 }
 
-func (s *MemoryStore) Delete(key string) {
+func (s *MemoryStore) Delete(key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if original, ok := s.keyToOriginal[key]; ok {
 		delete(s.keyToOriginal, key)
 		delete(s.originalToKey, original)
+		return true
 	}
+	return false
 }
 
 func (s *MemoryStore) Close() error {
