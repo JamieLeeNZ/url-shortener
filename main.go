@@ -3,15 +3,31 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/JamieLeeNZ/url-shortener/handlers"
 	"github.com/JamieLeeNZ/url-shortener/store"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	memStore := store.NewMemoryStore()
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
 
-	s := handlers.NewServer(memStore)
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
+
+	postgresStore, err := store.NewPostgresStore(dbURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer postgresStore.Close()
+
+	s := handlers.NewServer(postgresStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
 

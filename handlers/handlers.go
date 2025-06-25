@@ -13,10 +13,10 @@ import (
 )
 
 type Server struct {
-	store *store.MemoryStore
+	store store.URLStore
 }
 
-func NewServer(db *store.MemoryStore) *Server {
+func NewServer(db store.URLStore) *Server {
 	return &Server{
 		store: db,
 	}
@@ -134,7 +134,10 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.store.Delete(key)
+	if !s.store.Delete(key) {
+		http.Error(w, "failed to delete URL", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
