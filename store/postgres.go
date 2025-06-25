@@ -35,33 +35,57 @@ func (s *PostgresStore) Set(key, originalURL string) error {
     `, key, originalURL)
 	return err
 }
-
 func (s *PostgresStore) GetOriginalFromKey(key string) (string, bool) {
-	// TODO:
-	return "", false
+	var original string
+	err := s.db.QueryRow(context.Background(),
+		`SELECT original_url FROM url_mappings WHERE key = $1`, key).Scan(&original)
+	if err != nil {
+		return "", false
+	}
+	return original, true
 }
 
 func (s *PostgresStore) GetKeyFromOriginal(original string) (string, bool) {
-	//  TODO:
-	return "", false
+	var key string
+	err := s.db.QueryRow(context.Background(),
+		`SELECT key FROM url_mappings WHERE original_url = $1`, original).Scan(&key)
+	if err != nil {
+		return "", false
+	}
+	return key, true
 }
 
 func (s *PostgresStore) ContainsKey(key string) bool {
-	// TODO:
-	return false
+	var exists bool
+	err := s.db.QueryRow(context.Background(),
+		`SELECT EXISTS(SELECT 1 FROM url_mappings WHERE key = $1)`, key).Scan(&exists)
+	if err != nil {
+		return false
+	}
+	return exists
 }
 
 func (s *PostgresStore) Update(key, newValue string) bool {
-	// TODO:
-	return false
+	cmdTag, err := s.db.Exec(context.Background(),
+		`UPDATE url_mappings SET original_url = $1 WHERE key = $2`, newValue, key)
+	if err != nil {
+		return false
+	}
+	return cmdTag.RowsAffected() > 0
 }
 
 func (s *PostgresStore) Delete(key string) bool {
-	// TODO:
-	return false
+	cmdTag, err := s.db.Exec(context.Background(),
+		`DELETE FROM url_mappings WHERE key = $1`, key)
+	if err != nil {
+		return false
+	}
+	return cmdTag.RowsAffected() > 0
 }
 
 func (s *PostgresStore) Close() error {
-	// TODO:
+	if s.db != nil {
+		s.db.Close()
+	}
 	return nil
 }
