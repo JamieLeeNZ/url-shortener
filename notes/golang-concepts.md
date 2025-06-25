@@ -200,3 +200,49 @@ func (p Person) Greet() string {
   ```go
   var _ Store = (*MemoryStore)(nil) // Ensures MemoryStore implements Store interface
   ```
+
+## 10. Integrating PostgreSQL
+
+- Use the `pgxpool` package for PostgreSQL connection pooling.
+- Use `godotenv` to load environment variables from a `.env` file like `DATABASE_URL`.
+- Use `pgxpool` to create and manage a pool of DB connections:
+  ```go
+  func NewPostgresStore(connString string) (*PostgresStore, error) {
+    config, err := pgxpool.ParseConfig(connString)
+    if err != nil {
+      return nil, err
+    }
+    pool, err := pgxpool.NewWithConfig(context.Background(), config)
+    if err != nil {
+      return nil, err
+    }
+    if err := pool.Ping(context.Background()); err != nil {
+      pool.Close()
+      return nil, err
+    }
+    return &PostgresStore{db: pool}, nil
+  }
+  ```
+- A connection pool is a cache of database connections that can be reused, improving performance by avoiding the overhead of establishing new connections for each request.
+- `Context` is used with all DB calls for managing request lifetimes, timeouts, and cancellations.
+- CRUD operations can be implemented using `pgxpool` methods like `Query`, `Exec`, and `QueryRow`.
+- For example, to insert a new record:
+  ```go
+  func (s *PostgresStore) Set(key, originalURL string) error {
+  _, err := s.db.Exec(context.Background(), `
+    INSERT INTO url_mappings (key, original_url) VALUES ($1, $2)
+    ON CONFLICT (key) DO UPDATE SET original_url = EXCLUDED.original_url
+  `, key, originalURL)
+  return err
+  }
+  ```
+- Use placeholders (`$1`, `$2`, etc.) to safely inject parameters and avoid SQL injection.
+- Always close the pool with defer pool.Close() when shutting down the app.
+- The pool can be configured with options like maximum connections, connection timeouts, and idle timeouts to optimize performance based on the app's needs. For example:
+
+  ```go
+  config.MaxConns = 20               // Maximum open connections in the pool
+  config.MinConns = 5                // Minimum open connections to keep alive
+  config.MaxConnIdleTime = 5 * time.Minute  // Close connections idle longer than this
+  config.MaxConnLifetime = 30 * time.Minute // Recycle connections after this duration
+  ```
