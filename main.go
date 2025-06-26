@@ -39,10 +39,11 @@ func main() {
 
 	s := handlers.NewServer(postgresStore)
 
-	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0)
+	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0, 0)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
+	defer redisStore.Close()
 
 	http.HandleFunc("/health", s.HealthHandler)
 

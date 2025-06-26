@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -14,9 +15,10 @@ type RedisStore struct {
 
 func NewRedisStore(addr, password string, db int, ttl time.Duration) (*RedisStore, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
+		Addr:      addr,
+		Password:  password,
+		DB:        db,
+		TLSConfig: &tls.Config{},
 	})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
@@ -102,4 +104,8 @@ func (r *RedisStore) Delete(key string) bool {
 
 	err = r.client.Del(ctx, "original:"+original).Err()
 	return err == nil
+}
+
+func (r *RedisStore) Close() error {
+	return r.client.Close()
 }
