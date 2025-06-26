@@ -31,8 +31,7 @@ func NewRedisStore(addr, password string, db int, ttl time.Duration) (*RedisStor
 	}, nil
 }
 
-func (r *RedisStore) GetOriginalFromKey(key string) (string, bool) {
-	ctx := context.Background()
+func (r *RedisStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
 	val, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", false
@@ -43,8 +42,7 @@ func (r *RedisStore) GetOriginalFromKey(key string) (string, bool) {
 	return val, true
 }
 
-func (r *RedisStore) GetKeyFromOriginal(original string) (string, bool) {
-	ctx := context.Background()
+func (r *RedisStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
 	val, err := r.client.Get(ctx, "original:"+original).Result()
 	if err == redis.Nil {
 		return "", false
@@ -55,9 +53,7 @@ func (r *RedisStore) GetKeyFromOriginal(original string) (string, bool) {
 	return val, true
 }
 
-func (r *RedisStore) Set(key, original string) error {
-	ctx := context.Background()
-
+func (r *RedisStore) Set(ctx context.Context, key, original string) error {
 	err := r.client.Set(ctx, key, original, r.ttl).Err()
 	if err != nil {
 		return err
@@ -67,8 +63,7 @@ func (r *RedisStore) Set(key, original string) error {
 	return err
 }
 
-func (r *RedisStore) ContainsKey(key string) bool {
-	ctx := context.Background()
+func (r *RedisStore) ContainsKey(ctx context.Context, key string) bool {
 	exists, err := r.client.Exists(ctx, key).Result()
 	if err != nil {
 		return false
@@ -76,8 +71,7 @@ func (r *RedisStore) ContainsKey(key string) bool {
 	return exists > 0
 }
 
-func (r *RedisStore) Update(key, newValue string) bool {
-	ctx := context.Background()
+func (r *RedisStore) Update(ctx context.Context, key, newValue string) bool {
 	exists, err := r.client.Exists(ctx, key).Result()
 	if err != nil || exists == 0 {
 		return false
@@ -99,8 +93,7 @@ func (r *RedisStore) Update(key, newValue string) bool {
 	return err == nil
 }
 
-func (r *RedisStore) Delete(key string) bool {
-	ctx := context.Background()
+func (r *RedisStore) Delete(ctx context.Context, key string) bool {
 	original, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil || err != nil {
 		return false
