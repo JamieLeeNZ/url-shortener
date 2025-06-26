@@ -21,6 +21,16 @@ func main() {
 		log.Fatal("DATABASE_URL is not set")
 	}
 
+	redisAddress := os.Getenv("REDIS_ADDRESS")
+	if redisAddress == "" {
+		log.Fatal("REDIS_ADDRESS is not set")
+	}
+
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisPassword == "" {
+		log.Fatal("REDIS_PASSWORD is not set")
+	}
+
 	postgresStore, err := store.NewPostgresStore(dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
