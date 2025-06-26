@@ -67,6 +67,15 @@ func (r *RedisStore) Set(key, original string) error {
 	return err
 }
 
+func (r *RedisStore) ContainsKey(key string) bool {
+	ctx := context.Background()
+	exists, err := r.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false
+	}
+	return exists > 0
+}
+
 func (r *RedisStore) Update(key, newValue string) bool {
 	ctx := context.Background()
 	exists, err := r.client.Exists(ctx, key).Result()

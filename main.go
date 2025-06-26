@@ -37,13 +37,18 @@ func main() {
 	}
 	defer postgresStore.Close()
 
-	s := handlers.NewServer(postgresStore)
-
 	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0, 0)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	defer redisStore.Close()
+
+	cachedStore, err := store.NewCachedStore(redisStore, postgresStore)
+	if err != nil {
+		log.Fatalf("Failed to create cached store: %v", err)
+	}
+
+	s := handlers.NewServer(cachedStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
 
