@@ -43,6 +43,8 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	db := s.store
 
 	req, err := parseAndValidateURL(r)
@@ -53,14 +55,17 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	var key string
 
-	if k, found := db.GetKeyFromOriginal(req.Original); found {
+	if k, found := db.GetKeyFromOriginal(ctx, req.Original); found {
 		key = k
 	} else {
 		key = generateRandomKey(6)
-		for db.ContainsKey(key) {
+		for db.ContainsKey(ctx, key) {
 			key = generateRandomKey(6)
 		}
-		db.Set(key, req.Original)
+		if err := db.Set(ctx, key, req.Original); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp := models.URLShortenResponse{Key: key}
@@ -74,13 +79,15 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
-	original, ok := s.store.GetOriginalFromKey(key)
+	original, ok := s.store.GetOriginalFromKey(ctx, key)
 	if !ok {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
@@ -95,6 +102,8 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
@@ -107,7 +116,7 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	success := s.store.Update(key, req.Original)
+	success := s.store.Update(ctx, key, req.Original)
 	if !success {
 		http.Error(w, "key not found or new URL already mapped to a different key", http.StatusNotFound)
 		return
@@ -123,18 +132,20 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
-	if !s.store.ContainsKey(key) {
+	if !s.store.ContainsKey(ctx, key) {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
 	}
 
-	if !s.store.Delete(key) {
+	if !s.store.Delete(ctx, key) {
 		http.Error(w, "failed to delete URL", http.StatusInternalServerError)
 		return
 	}

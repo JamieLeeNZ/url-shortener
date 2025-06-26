@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/JamieLeeNZ/url-shortener/handlers"
 	"github.com/JamieLeeNZ/url-shortener/store"
@@ -21,13 +22,34 @@ func main() {
 		log.Fatal("DATABASE_URL is not set")
 	}
 
+	redisAddress := os.Getenv("REDIS_ADDRESS")
+	if redisAddress == "" {
+		log.Fatal("REDIS_ADDRESS is not set")
+	}
+
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisPassword == "" {
+		log.Fatal("REDIS_PASSWORD is not set")
+	}
+
 	postgresStore, err := store.NewPostgresStore(dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer postgresStore.Close()
 
-	s := handlers.NewServer(postgresStore)
+	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0, 24*time.Hour)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisStore.Close()
+
+	cachedStore, err := store.NewCachedStore(redisStore, postgresStore)
+	if err != nil {
+		log.Fatalf("Failed to create cached store: %v", err)
+	}
+
+	s := handlers.NewServer(cachedStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
 

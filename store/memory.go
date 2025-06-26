@@ -1,6 +1,9 @@
 package store
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 type MemoryStore struct {
 	mu            sync.RWMutex
@@ -17,7 +20,7 @@ func NewMemoryStore() *MemoryStore {
 
 var _ URLStore = (*MemoryStore)(nil)
 
-func (s *MemoryStore) Set(key, originalURL string) error {
+func (s *MemoryStore) Set(ctx context.Context, key, originalURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keyToOriginal[key] = originalURL
@@ -25,28 +28,28 @@ func (s *MemoryStore) Set(key, originalURL string) error {
 	return nil
 }
 
-func (s *MemoryStore) GetOriginalFromKey(key string) (string, bool) {
+func (s *MemoryStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	value, ok := s.keyToOriginal[key]
 	return value, ok
 }
 
-func (s *MemoryStore) GetKeyFromOriginal(original string) (string, bool) {
+func (s *MemoryStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key, ok := s.originalToKey[original]
 	return key, ok
 }
 
-func (s *MemoryStore) ContainsKey(key string) bool {
+func (s *MemoryStore) ContainsKey(ctx context.Context, key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	_, ok := s.keyToOriginal[key]
 	return ok
 }
 
-func (s *MemoryStore) Update(key, newValue string) bool {
+func (s *MemoryStore) Update(ctx context.Context, key, newValue string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -70,7 +73,7 @@ func (s *MemoryStore) Update(key, newValue string) bool {
 	return true
 }
 
-func (s *MemoryStore) Delete(key string) bool {
+func (s *MemoryStore) Delete(ctx context.Context, key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if original, ok := s.keyToOriginal[key]; ok {

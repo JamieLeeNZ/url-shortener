@@ -1,11 +1,13 @@
 package store
 
+import "context"
+
 type URLStore interface {
-	Set(key, originalURL string) error
-	GetOriginalFromKey(key string) (string, bool)
-	GetKeyFromOriginal(originalURL string) (string, bool)
-	Update(key, newURL string) bool
-	Delete(key string) bool
-	ContainsKey(key string) bool
+	Set(ctx context.Context, key, originalURL string) error
+	GetOriginalFromKey(ctx context.Context, key string) (string, bool)
+	GetKeyFromOriginal(ctx context.Context, original string) (string, bool)
+	ContainsKey(ctx context.Context, key string) bool
+	Update(ctx context.Context, key, newValue string) bool
+	Delete(ctx context.Context, key string) bool
 	Close() error
 }
