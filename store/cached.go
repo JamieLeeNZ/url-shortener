@@ -33,6 +33,8 @@ func (s *CachedStore) GetOriginalFromKey(key string) (string, bool) {
 	if found {
 		log.Printf("[db] fetched and caching key: %s", key)
 		s.cache.Set(key, original)
+	} else {
+		log.Printf("[db] key not found: %s", key)
 	}
 	return original, found
 }
@@ -48,6 +50,8 @@ func (s *CachedStore) GetKeyFromOriginal(original string) (string, bool) {
 	if found {
 		log.Printf("[db] fetched and caching original URL: %s", original)
 		s.cache.Set(key, original)
+	} else {
+		log.Printf("[db] original URL not found: %s", original)
 	}
 	return key, found
 }

@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/JamieLeeNZ/url-shortener/handlers"
 	"github.com/JamieLeeNZ/url-shortener/store"
@@ -37,7 +38,7 @@ func main() {
 	}
 	defer postgresStore.Close()
 
-	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0, 0)
+	redisStore, err := store.NewRedisStore(redisAddress, redisPassword, 0, 24*time.Hour)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}

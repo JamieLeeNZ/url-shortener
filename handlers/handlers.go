@@ -60,7 +60,10 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		for db.ContainsKey(key) {
 			key = generateRandomKey(6)
 		}
-		db.Set(key, req.Original)
+		if err := db.Set(key, req.Original); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp := models.URLShortenResponse{Key: key}

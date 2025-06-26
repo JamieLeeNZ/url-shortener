@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -15,6 +16,7 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
@@ -28,13 +30,19 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 
 var _ URLStore = (*PostgresStore)(nil)
 
+var mu sync.Mutex
+
 func (s *PostgresStore) Set(key, originalURL string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	_, err := s.db.Exec(context.Background(), `
-        INSERT INTO url_mappings (key, original_url) VALUES ($1, $2)
-        ON CONFLICT (key) DO UPDATE SET original_url = EXCLUDED.original_url
-    `, key, originalURL)
+		INSERT INTO url_mappings (key, original_url) VALUES ($1, $2)
+		ON CONFLICT (key) DO UPDATE SET original_url = EXCLUDED.original_url
+	`, key, originalURL)
 	return err
 }
+
 func (s *PostgresStore) GetOriginalFromKey(key string) (string, bool) {
 	var original string
 	err := s.db.QueryRow(context.Background(),
