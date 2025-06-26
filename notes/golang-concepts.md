@@ -291,3 +291,13 @@ func (p Person) Greet() string {
   rdb.Set(ctx, "shortKey", "originalURL", ttl)
   rdb.Set(ctx, "original:"+originalURL, "shortKey", ttl)
   ```
+
+## 12. Context
+
+- The `context` package provides a way to pass request-scoped values, cancellation signals, and deadlines across API boundaries.
+- It is used to manage the lifecycle of requests, especially in concurrent applications.
+- Always pass context.Context from the HTTP handler (e.g., r.Context()) down to all database methods as a first argument instead of using context.Background() inside those methods. This ensures:
+  - The DB operations are tied to the lifecycle of the HTTP request.
+  - DB calls can be canceled promptly if the client disconnects or request times out.
+  - Proper propagation of deadlines, cancellation signals, and tracing metadata.
+- Using context.Background() inside DB calls ignores the request lifecycle and can cause lingering DB work after the client has gone.
