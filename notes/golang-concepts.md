@@ -246,3 +246,48 @@ func (p Person) Greet() string {
   config.MaxConnIdleTime = 5 * time.Minute  // Close connections idle longer than this
   config.MaxConnLifetime = 30 * time.Minute // Recycle connections after this duration
   ```
+
+## 11. Integrating Redis
+
+- Use the `go-redis` package to connect to Redis.
+- Create a constructor function to initialize the Redis client:
+  ```go
+  func NewRedisStore(addr string) (*RedisStore, error) {
+      client := redis.NewClient(&redis.Options{
+          Addr: addr,
+      })
+      _, err := client.Ping(context.Background()).Result()
+      if err != nil {
+          return nil, err
+      }
+      return &RedisStore{client: client}, nil
+  }
+  ```
+- All Redis operations should use a context for request lifetime management:
+
+  ```go
+  func (s *RedisStore) Set(key, value string) error {
+      return s.client.Set(context.Background(), key, value, 0).Err()
+  }
+
+  func (s *RedisStore) Get(key string) (string, error) {
+      return s.client.Get(context.Background(), key).Result()
+  }
+  ```
+
+- Key redis operations include:
+  - `Set`: Store a key-value pair.
+  - `Get`: Retrieve the value for a key.
+  - `Del`: Delete a key.
+  - `Exists`: Check if a key exists.
+- TTL (time-to-live) can be set for keys to automatically delete them after a certain time.
+  ```go
+  func (s *RedisStore) SetWithTTL(key, value string, ttl time.Duration) error {
+      return s.client.Set(context.Background(), key, value, ttl).Err()
+  }
+  ```
+- A common pattern is a two-way mapping:
+  ```go
+  rdb.Set(ctx, "shortKey", "originalURL", ttl)
+  rdb.Set(ctx, "original:"+originalURL, "shortKey", ttl)
+  ```
