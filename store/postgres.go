@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,6 +16,9 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	config.ConnConfig.StatementCacheCapacity = 0
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
