@@ -31,6 +31,12 @@ func NewRedisStore(addr, password string, db int, ttl time.Duration) (*RedisStor
 	}, nil
 }
 
+var _ RedisClientProvider = (*RedisStore)(nil)
+
+func (r *RedisStore) RawClient() *redis.Client {
+	return r.client
+}
+
 func (r *RedisStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
 	val, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {

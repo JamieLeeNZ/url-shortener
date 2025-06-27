@@ -54,7 +54,12 @@ func main() {
 		log.Fatalf("Failed to create cached store: %v", err)
 	}
 
-	s := handlers.NewServer(cachedStore, postgresStore)
+	redisClient := cachedStore.RedisClient()
+	if redisClient == nil {
+		log.Fatal("Redis client not available in cached store")
+	}
+
+	s := handlers.NewServer(cachedStore, postgresStore, redisClient)
 
 	http.HandleFunc("/health", s.HealthHandler)
 

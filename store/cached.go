@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"log"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type CachedStore struct {
@@ -10,11 +12,22 @@ type CachedStore struct {
 	db    URLStore
 }
 
+type RedisClientProvider interface {
+	RawClient() *redis.Client
+}
+
 func NewCachedStore(cache, db URLStore) (*CachedStore, error) {
 	return &CachedStore{cache: cache, db: db}, nil
 }
 
 var _ URLStore = (*CachedStore)(nil)
+
+func (c *CachedStore) RedisClient() *redis.Client {
+	if provider, ok := c.cache.(RedisClientProvider); ok {
+		return provider.RawClient()
+	}
+	return nil
+}
 
 func (s *CachedStore) Set(ctx context.Context, key, originalURL string) error {
 	if err := s.db.Set(ctx, key, originalURL); err != nil {

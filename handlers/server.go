@@ -10,17 +10,20 @@ import (
 
 	"github.com/JamieLeeNZ/url-shortener/models"
 	"github.com/JamieLeeNZ/url-shortener/store"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
 	urlStore  store.URLStore
 	userStore store.UserStore
+	redis     *redis.Client
 }
 
-func NewServer(urlStore store.URLStore, userStore store.UserStore) *Server {
+func NewServer(urlStore store.URLStore, userStore store.UserStore, redis *redis.Client) *Server {
 	return &Server{
 		urlStore:  urlStore,
 		userStore: userStore,
+		redis:     redis,
 	}
 }
 
