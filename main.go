@@ -54,14 +54,14 @@ func main() {
 		log.Fatalf("Failed to create cached store: %v", err)
 	}
 
-	s := handlers.NewServer(cachedStore)
+	s := handlers.NewServer(cachedStore, postgresStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
 
 	handlers.InitOAuth()
 
-	http.HandleFunc("/login", handlers.GoogleLogin)
-	http.HandleFunc("/auth/google/callback", handlers.GoogleCallback)
+	http.HandleFunc("/login", s.GoogleLogin)
+	http.HandleFunc("/auth/google/callback", s.GoogleCallback)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

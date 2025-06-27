@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"time"
 
+	"github.com/JamieLeeNZ/url-shortener/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,6 +34,7 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 }
 
 var _ URLStore = (*PostgresStore)(nil)
+var _ UserStore = (*PostgresStore)(nil)
 
 func (s *PostgresStore) Set(ctx context.Context, key, originalURL string) error {
 	_, err := s.db.Exec(ctx, `
@@ -94,4 +97,34 @@ func (s *PostgresStore) Close() error {
 		s.db.Close()
 	}
 	return nil
+}
+
+func (s *PostgresStore) GetOrCreateUser(ctx context.Context, user models.User) (models.User, error) {
+	var existing models.User
+
+	err := s.db.QueryRow(ctx, `
+		SELECT id, email, name, picture_url, created_at
+		FROM users WHERE id = $1`,
+		user.ID,
+	).Scan(&existing.ID, &existing.Email, &existing.Name, &existing.Picture, &existing.CreatedAt)
+
+	if err == nil {
+		return existing, nil
+	}
+
+	if err != pgx.ErrNoRows {
+		return models.User{}, err
+	}
+
+	_, err = s.db.Exec(ctx, `
+		INSERT INTO users (id, email, name, picture_url, created_at)
+		VALUES ($1, $2, $3, $4, NOW())`,
+		user.ID, user.Email, user.Name, user.Picture,
+	)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	user.CreatedAt = time.Now()
+	return user, nil
 }

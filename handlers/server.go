@@ -13,12 +13,14 @@ import (
 )
 
 type Server struct {
-	store store.URLStore
+	urlStore  store.URLStore
+	userStore store.UserStore
 }
 
-func NewServer(db store.URLStore) *Server {
+func NewServer(urlStore store.URLStore, userStore store.UserStore) *Server {
 	return &Server{
-		store: db,
+		urlStore:  urlStore,
+		userStore: userStore,
 	}
 }
 
@@ -45,7 +47,7 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	db := s.store
+	db := s.urlStore
 
 	req, err := parseAndValidateURL(r)
 	if err != nil {
@@ -87,7 +89,7 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	original, ok := s.store.GetOriginalFromKey(ctx, key)
+	original, ok := s.urlStore.GetOriginalFromKey(ctx, key)
 	if !ok {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
@@ -116,7 +118,7 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	success := s.store.Update(ctx, key, req.Original)
+	success := s.urlStore.Update(ctx, key, req.Original)
 	if !success {
 		http.Error(w, "key not found or new URL already mapped to a different key", http.StatusNotFound)
 		return
@@ -140,12 +142,12 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.store.ContainsKey(ctx, key) {
+	if !s.urlStore.ContainsKey(ctx, key) {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
 	}
 
-	if !s.store.Delete(ctx, key) {
+	if !s.urlStore.Delete(ctx, key) {
 		http.Error(w, "failed to delete URL", http.StatusInternalServerError)
 		return
 	}

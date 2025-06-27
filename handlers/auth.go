@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/JamieLeeNZ/url-shortener/models"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -69,7 +70,7 @@ func generateOauthState(w http.ResponseWriter) string {
 	return state
 }
 
-func GoogleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	state := generateOauthState(w)
 	if state == "" {
 		return
@@ -78,7 +79,7 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func GoogleCallback(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	oauthState, err := r.Cookie("oauthstate")
 	if err != nil {
 		http.Error(w, "State cookie missing", http.StatusBadRequest)
@@ -98,17 +99,28 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user GoogleUser
-	if err := json.Unmarshal(data, &user); err != nil {
+	var gUser GoogleUser
+	if err := json.Unmarshal(data, &gUser); err != nil {
 		log.Println("json unmarshal error:", err)
 		http.Error(w, "Failed to parse user data", http.StatusInternalServerError)
 		return
 	}
 
-	// TODO: Save user to DB or start session
+	user := models.User{
+		ID:      gUser.ID,
+		Email:   gUser.Email,
+		Name:    gUser.Name,
+		Picture: gUser.Picture,
+	}
+
+	savedUser, err := s.userStore.GetOrCreateUser(r.Context(), user)
+	if err != nil {
+		http.Error(w, "Failed to save user", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(savedUser)
 }
 
 func getUserDataFromGoogle(code string) ([]byte, error) {
