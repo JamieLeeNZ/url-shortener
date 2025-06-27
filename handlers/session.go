@@ -8,7 +8,6 @@ import (
 
 	"github.com/JamieLeeNZ/url-shortener/models"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 )
 
 type contextKey string
@@ -20,13 +19,7 @@ const (
 	userContextKey    = contextKey("user")
 )
 
-var redisClient *redis.Client
-
-func SetRedisClient(client *redis.Client) {
-	redisClient = client
-}
-
-func createSession(w http.ResponseWriter, ctx context.Context, user models.User) error {
+func (s *Server) createSession(w http.ResponseWriter, ctx context.Context, user models.User) error {
 	sessionID := uuid.New().String()
 
 	data, err := json.Marshal(user)
@@ -34,7 +27,7 @@ func createSession(w http.ResponseWriter, ctx context.Context, user models.User)
 		return err
 	}
 
-	err = redisClient.Set(ctx, sessionPrefix+sessionID, data, sessionDuration).Err()
+	err = s.redisClient.Set(ctx, sessionPrefix+sessionID, data, sessionDuration).Err()
 	if err != nil {
 		return err
 	}
@@ -44,20 +37,20 @@ func createSession(w http.ResponseWriter, ctx context.Context, user models.User)
 		Value:    sessionID,
 		Expires:  time.Now().Add(sessionDuration),
 		HttpOnly: true,
-		Secure:   false, // Set to true in production
+		Secure:   false, // set to true in production with HTTPS
 		Path:     "/",
 	})
 
 	return nil
 }
 
-func getSessionUser(r *http.Request) (*models.User, error) {
+func (s *Server) getSessionUser(r *http.Request) (*models.User, error) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := redisClient.Get(r.Context(), sessionPrefix+cookie.Value).Result()
+	data, err := s.redisClient.Get(r.Context(), sessionPrefix+cookie.Value).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +60,14 @@ func getSessionUser(r *http.Request) (*models.User, error) {
 		return nil, err
 	}
 
-	redisClient.Expire(r.Context(), sessionPrefix+cookie.Value, sessionDuration)
+	s.redisClient.Expire(r.Context(), sessionPrefix+cookie.Value, sessionDuration)
 
 	return &user, nil
 }
 
-func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
+func (s *Server) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := getSessionUser(r)
+		user, err := s.getSessionUser(r)
 		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
@@ -93,10 +86,10 @@ func GetCurrentUser(r *http.Request) *models.User {
 	return user
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
-		redisClient.Del(r.Context(), sessionPrefix+cookie.Value)
+		s.redisClient.Del(r.Context(), sessionPrefix+cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{

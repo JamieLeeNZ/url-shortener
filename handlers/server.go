@@ -14,16 +14,16 @@ import (
 )
 
 type Server struct {
-	urlStore  store.URLStore
-	userStore store.UserStore
-	redis     *redis.Client
+	urlStore    store.URLStore
+	userStore   store.UserStore
+	redisClient *redis.Client
 }
 
-func NewServer(urlStore store.URLStore, userStore store.UserStore, redis *redis.Client) *Server {
+func NewServer(urlStore store.URLStore, userStore store.UserStore, redisClient *redis.Client) *Server {
 	return &Server{
-		urlStore:  urlStore,
-		userStore: userStore,
-		redis:     redis,
+		urlStore:    urlStore,
+		userStore:   userStore,
+		redisClient: redisClient,
 	}
 }
 

@@ -119,6 +119,11 @@ func (s *Server) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.createSession(w, r.Context(), savedUser); err != nil {
+		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(savedUser)
 }
