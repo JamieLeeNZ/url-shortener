@@ -10,7 +10,11 @@ import (
 	"github.com/JamieLeeNZ/url-shortener/store"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
+
+var googleOauthConfig *oauth2.Config
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -30,6 +34,25 @@ func main() {
 	redisPassword := os.Getenv("REDIS_PASSWORD")
 	if redisPassword == "" {
 		log.Fatal("REDIS_PASSWORD is not set")
+	}
+
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	if clientID == "" || clientSecret == "" {
+		log.Fatal("GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set")
+	}
+
+	googleOauthConfig = &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  "http://localhost:8080/auth/google/callback",
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Endpoint:     google.Endpoint,
+	}
+
+	oauthStateString := os.Getenv("OAUTH_STATE_STRING")
+	if oauthStateString == "" {
+		log.Fatal("OAUTH_STATE_STRING not set")
 	}
 
 	postgresStore, err := store.NewPostgresStore(dbURL)
@@ -52,6 +75,9 @@ func main() {
 	s := handlers.NewServer(cachedStore)
 
 	http.HandleFunc("/health", s.HealthHandler)
+
+	// http.HandleFunc("/login", handleGoogleLogin)
+	// http.HandleFunc("/auth/google/callback", handleGoogleCallback)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
