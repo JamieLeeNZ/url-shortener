@@ -31,10 +31,10 @@ type GoogleUser struct {
 func InitOAuth() {
 	clientID := os.Getenv("CLIENT_ID")
 	clientSecret := os.Getenv("CLIENT_SECRET")
-	redirectURL := "http://localhost:8080/auth/google/callback"
+	redirectURL := os.Getenv("REDIRECT_URL")
 
-	if clientID == "" || clientSecret == "" {
-		log.Fatal("Missing CLIENT_ID or CLIENT_SECRET")
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		log.Fatal("Missing CLIENT_ID or CLIENT_SECRET or REDIRECT_URL environment variables")
 	}
 
 	googleOauthConfig = &oauth2.Config{
