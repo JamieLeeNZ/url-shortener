@@ -10,15 +10,20 @@ import (
 
 	"github.com/JamieLeeNZ/url-shortener/models"
 	"github.com/JamieLeeNZ/url-shortener/store"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
-	store store.URLStore
+	urlStore    store.URLStore
+	userStore   store.UserStore
+	redisClient *redis.Client
 }
 
-func NewServer(db store.URLStore) *Server {
+func NewServer(urlStore store.URLStore, userStore store.UserStore, redisClient *redis.Client) *Server {
 	return &Server{
-		store: db,
+		urlStore:    urlStore,
+		userStore:   userStore,
+		redisClient: redisClient,
 	}
 }
 
@@ -45,7 +50,13 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	db := s.store
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	db := s.urlStore
 
 	req, err := parseAndValidateURL(r)
 	if err != nil {
@@ -55,14 +66,15 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	var key string
 
-	if k, found := db.GetKeyFromOriginal(ctx, req.Original); found {
+	if k, _, found := db.GetKeyFromOriginal(ctx, req.Original); found {
 		key = k
 	} else {
 		key = generateRandomKey(6)
 		for db.ContainsKey(ctx, key) {
 			key = generateRandomKey(6)
 		}
-		if err := db.Set(ctx, key, req.Original); err != nil {
+
+		if err := db.Set(ctx, key, req.Original, user.ID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -87,7 +99,7 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	original, ok := s.store.GetOriginalFromKey(ctx, key)
+	original, _, ok := s.urlStore.GetOriginalFromKey(ctx, key)
 	if !ok {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return
@@ -104,6 +116,12 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
@@ -116,7 +134,13 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	success := s.store.Update(ctx, key, req.Original)
+	_, existingUserID, found := s.urlStore.GetKeyFromOriginal(ctx, req.Original)
+	if found && existingUserID != user.ID {
+		http.Error(w, "forbidden: you do not own this URL", http.StatusForbidden)
+		return
+	}
+
+	success := s.urlStore.Update(ctx, key, req.Original)
 	if !success {
 		http.Error(w, "key not found or new URL already mapped to a different key", http.StatusNotFound)
 		return
@@ -134,18 +158,28 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
-	if !s.store.ContainsKey(ctx, key) {
-		http.Error(w, "invalid URL", http.StatusNotFound)
+	_, existingUserID, found := s.urlStore.GetOriginalFromKey(ctx, key)
+	if !found {
+		http.Error(w, "URL not found", http.StatusNotFound)
+		return
+	} else if existingUserID != user.ID {
+		http.Error(w, "forbidden: you do not own this URL", http.StatusForbidden)
 		return
 	}
 
-	if !s.store.Delete(ctx, key) {
+	if !s.urlStore.Delete(ctx, key) {
 		http.Error(w, "failed to delete URL", http.StatusInternalServerError)
 		return
 	}
@@ -169,4 +203,21 @@ func parseAndValidateURL(r *http.Request) (models.URLShortenRequest, error) {
 	}
 
 	return req, nil
+}
+
+func (s *Server) ListUserLinks(w http.ResponseWriter, r *http.Request) {
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := s.userStore.GetURLsByUserID(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, "Failed to fetch URLs", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
 }

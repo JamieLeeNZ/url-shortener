@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -11,6 +12,18 @@ import (
 type RedisStore struct {
 	client *redis.Client
 	ttl    time.Duration
+}
+
+type cachedURL struct {
+	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
+}
+
+var _ RedisClientProvider = (*RedisStore)(nil)
+var _ URLStore = (*RedisStore)(nil)
+
+func (r *RedisStore) RawClient() *redis.Client {
+	return r.client
 }
 
 func NewRedisStore(addr, password string, db int, ttl time.Duration) (*RedisStore, error) {
@@ -31,30 +44,14 @@ func NewRedisStore(addr, password string, db int, ttl time.Duration) (*RedisStor
 	}, nil
 }
 
-func (r *RedisStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
-	val, err := r.client.Get(ctx, key).Result()
-	if err == redis.Nil {
-		return "", false
-	}
+func (r *RedisStore) Set(ctx context.Context, key, original, userID string) error {
+	data := cachedURL{OriginalURL: original, UserID: userID}
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return "", false
+		return err
 	}
-	return val, true
-}
 
-func (r *RedisStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
-	val, err := r.client.Get(ctx, "original:"+original).Result()
-	if err == redis.Nil {
-		return "", false
-	}
-	if err != nil {
-		return "", false
-	}
-	return val, true
-}
-
-func (r *RedisStore) Set(ctx context.Context, key, original string) error {
-	err := r.client.Set(ctx, key, original, r.ttl).Err()
+	err = r.client.Set(ctx, key, jsonData, r.ttl).Err()
 	if err != nil {
 		return err
 	}
@@ -63,28 +60,41 @@ func (r *RedisStore) Set(ctx context.Context, key, original string) error {
 	return err
 }
 
-func (r *RedisStore) ContainsKey(ctx context.Context, key string) bool {
-	exists, err := r.client.Exists(ctx, key).Result()
-	if err != nil {
-		return false
+func (r *RedisStore) GetOriginalFromKey(ctx context.Context, key string) (string, string, bool) {
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil || err != nil {
+		return "", "", false
 	}
-	return exists > 0
+
+	var data cachedURL
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		return "", "", false
+	}
+
+	return data.OriginalURL, data.UserID, true
 }
 
 func (r *RedisStore) Update(ctx context.Context, key, newValue string) bool {
-	exists, err := r.client.Exists(ctx, key).Result()
-	if err != nil || exists == 0 {
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil || err != nil {
 		return false
 	}
 
-	oldOriginal, err := r.client.Get(ctx, key).Result()
+	var data cachedURL
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		return false
+	}
+
+	r.client.Del(ctx, "original:"+data.OriginalURL)
+
+	data.OriginalURL = newValue
+
+	newJSON, err := json.Marshal(data)
 	if err != nil {
 		return false
 	}
 
-	r.client.Del(ctx, "original:"+oldOriginal)
-
-	err = r.client.Set(ctx, key, newValue, r.ttl).Err()
+	err = r.client.Set(ctx, key, newJSON, r.ttl).Err()
 	if err != nil {
 		return false
 	}
@@ -93,9 +103,43 @@ func (r *RedisStore) Update(ctx context.Context, key, newValue string) bool {
 	return err == nil
 }
 
-func (r *RedisStore) Delete(ctx context.Context, key string) bool {
-	original, err := r.client.Get(ctx, key).Result()
+func (r *RedisStore) ContainsKey(ctx context.Context, key string) bool {
+	_, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return false
+	} else if err != nil {
+		return false
+	}
+	return true
+}
+
+func (r *RedisStore) GetKeyFromOriginal(ctx context.Context, original string) (string, string, bool) {
+	key, err := r.client.Get(ctx, "original:"+original).Result()
 	if err == redis.Nil || err != nil {
+		return "", "", false
+	}
+
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil || err != nil {
+		return "", "", false
+	}
+
+	var data cachedURL
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		return "", "", false
+	}
+
+	return key, data.UserID, true
+}
+
+func (r *RedisStore) Delete(ctx context.Context, key string) bool {
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil || err != nil {
+		return false
+	}
+
+	var data cachedURL
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
 		return false
 	}
 
@@ -104,7 +148,7 @@ func (r *RedisStore) Delete(ctx context.Context, key string) bool {
 		return false
 	}
 
-	err = r.client.Del(ctx, "original:"+original).Err()
+	err = r.client.Del(ctx, "original:"+data.OriginalURL).Err()
 	return err == nil
 }
 

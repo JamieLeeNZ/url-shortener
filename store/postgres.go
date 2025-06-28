@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"time"
 
+	"github.com/JamieLeeNZ/url-shortener/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,33 +34,34 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 }
 
 var _ URLStore = (*PostgresStore)(nil)
+var _ UserStore = (*PostgresStore)(nil)
 
-func (s *PostgresStore) Set(ctx context.Context, key, originalURL string) error {
+func (s *PostgresStore) Set(ctx context.Context, key, originalURL string, userID string) error {
 	_, err := s.db.Exec(ctx, `
-		INSERT INTO url_mappings (key, original_url) VALUES ($1, $2)
+		INSERT INTO url_mappings (key, original_url, user_id) VALUES ($1, $2, $3)
 		ON CONFLICT (key) DO UPDATE SET original_url = EXCLUDED.original_url
-	`, key, originalURL)
+	`, key, originalURL, userID)
 	return err
 }
 
-func (s *PostgresStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
-	var original string
+func (s *PostgresStore) GetOriginalFromKey(ctx context.Context, key string) (string, string, bool) {
+	var original, userID string
 	err := s.db.QueryRow(ctx,
-		`SELECT original_url FROM url_mappings WHERE key = $1`, key).Scan(&original)
+		`SELECT original_url, user_id FROM url_mappings WHERE key = $1`, key).Scan(&original, &userID)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
-	return original, true
+	return original, userID, true
 }
 
-func (s *PostgresStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
-	var key string
+func (s *PostgresStore) GetKeyFromOriginal(ctx context.Context, original string) (string, string, bool) {
+	var key, userID string
 	err := s.db.QueryRow(ctx,
-		`SELECT key FROM url_mappings WHERE original_url = $1`, original).Scan(&key)
+		`SELECT key, user_id FROM url_mappings WHERE original_url = $1`, original).Scan(&key, &userID)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
-	return key, true
+	return key, userID, true
 }
 
 func (s *PostgresStore) ContainsKey(ctx context.Context, key string) bool {
@@ -94,4 +97,57 @@ func (s *PostgresStore) Close() error {
 		s.db.Close()
 	}
 	return nil
+}
+
+func (s *PostgresStore) GetOrCreateUser(ctx context.Context, user models.User) (models.User, error) {
+	var existing models.User
+
+	err := s.db.QueryRow(ctx, `
+		SELECT id, email, name, picture_url, created_at
+		FROM users WHERE id = $1`,
+		user.ID,
+	).Scan(&existing.ID, &existing.Email, &existing.Name, &existing.Picture, &existing.CreatedAt)
+
+	if err == nil {
+		return existing, nil
+	}
+
+	if err != pgx.ErrNoRows {
+		return models.User{}, err
+	}
+
+	_, err = s.db.Exec(ctx, `
+		INSERT INTO users (id, email, name, picture_url, created_at)
+		VALUES ($1, $2, $3, $4, NOW())`,
+		user.ID, user.Email, user.Name, user.Picture,
+	)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	user.CreatedAt = time.Now()
+	return user, nil
+}
+
+func (s *PostgresStore) GetURLsByUserID(ctx context.Context, userID string) ([]models.URLMapping, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT key, original_url, created_at
+		FROM url_mappings
+		WHERE user_id = $1
+		ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var urls []models.URLMapping
+	for rows.Next() {
+		var u models.URLMapping
+		if err := rows.Scan(&u.Key, &u.Original, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		urls = append(urls, u)
+	}
+
+	return urls, nil
 }

@@ -32,6 +32,11 @@ func main() {
 		log.Fatal("REDIS_PASSWORD is not set")
 	}
 
+	oauthStateString := os.Getenv("OAUTH_STATE_STRING")
+	if oauthStateString == "" {
+		log.Fatal("OAUTH_STATE_STRING not set")
+	}
+
 	postgresStore, err := store.NewPostgresStore(dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -49,20 +54,35 @@ func main() {
 		log.Fatalf("Failed to create cached store: %v", err)
 	}
 
-	s := handlers.NewServer(cachedStore)
+	redisClient := cachedStore.RedisClient()
+	if redisClient == nil {
+		log.Fatal("Redis client not available in cached store")
+	}
+
+	s := handlers.NewServer(cachedStore, postgresStore, redisClient)
 
 	http.HandleFunc("/health", s.HealthHandler)
+
+	handlers.InitOAuth()
+
+	http.HandleFunc("/login", s.GoogleLogin)
+	http.HandleFunc("/auth/google/callback", s.GoogleCallback)
+
+	http.HandleFunc("/me", s.RequireAuth(s.MeHandler))
+	http.HandleFunc("/links", s.RequireAuth(s.ListUserLinks))
+
+	http.HandleFunc("/logout", s.Logout)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			s.CreateHandler(w, r)
+			s.RequireAuth(s.CreateHandler)(w, r)
 		case http.MethodGet:
 			s.GetHandler(w, r)
 		case http.MethodPut:
-			s.UpdateHandler(w, r)
+			s.RequireAuth(s.UpdateHandler)(w, r)
 		case http.MethodDelete:
-			s.DeleteHandler(w, r)
+			s.RequireAuth(s.DeleteHandler)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -3,11 +3,17 @@ package store
 import (
 	"context"
 	"log"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type CachedStore struct {
 	cache URLStore
 	db    URLStore
+}
+
+type RedisClientProvider interface {
+	RawClient() *redis.Client
 }
 
 func NewCachedStore(cache, db URLStore) (*CachedStore, error) {
@@ -16,45 +22,52 @@ func NewCachedStore(cache, db URLStore) (*CachedStore, error) {
 
 var _ URLStore = (*CachedStore)(nil)
 
-func (s *CachedStore) Set(ctx context.Context, key, originalURL string) error {
-	if err := s.db.Set(ctx, key, originalURL); err != nil {
-		return err
+func (c *CachedStore) RedisClient() *redis.Client {
+	if provider, ok := c.cache.(RedisClientProvider); ok {
+		return provider.RawClient()
 	}
-	return s.cache.Set(ctx, key, originalURL)
+	return nil
 }
 
-func (s *CachedStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
-	if original, found := s.cache.GetOriginalFromKey(ctx, key); found {
+func (s *CachedStore) Set(ctx context.Context, key, originalURL string, userID string) error {
+	if err := s.db.Set(ctx, key, originalURL, userID); err != nil {
+		return err
+	}
+	return s.cache.Set(ctx, key, originalURL, userID)
+}
+
+func (s *CachedStore) GetOriginalFromKey(ctx context.Context, key string) (string, string, bool) {
+	if original, userID, found := s.cache.GetOriginalFromKey(ctx, key); found {
 		log.Printf("[cache] hit for key: %s", key)
-		return original, true
+		return original, userID, true
 	}
 	log.Printf("[cache] miss for key: %s", key)
 
-	original, found := s.db.GetOriginalFromKey(ctx, key)
+	original, userID, found := s.db.GetOriginalFromKey(ctx, key)
 	if found {
 		log.Printf("[db] fetched and caching key: %s", key)
-		s.cache.Set(ctx, key, original)
+		s.cache.Set(ctx, key, original, userID)
 	} else {
 		log.Printf("[db] key not found: %s", key)
 	}
-	return original, found
+	return original, userID, found
 }
 
-func (s *CachedStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
-	if key, found := s.cache.GetKeyFromOriginal(ctx, original); found {
+func (s *CachedStore) GetKeyFromOriginal(ctx context.Context, original string) (string, string, bool) {
+	if key, userID, found := s.cache.GetKeyFromOriginal(ctx, original); found {
 		log.Printf("[cache] hit for original URL: %s", original)
-		return key, true
+		return key, userID, true
 	}
 	log.Printf("[cache] miss for original URL: %s", original)
 
-	key, found := s.db.GetKeyFromOriginal(ctx, original)
+	key, userID, found := s.db.GetKeyFromOriginal(ctx, original)
 	if found {
 		log.Printf("[db] fetched and caching original URL: %s", original)
-		s.cache.Set(ctx, key, original)
+		s.cache.Set(ctx, key, original, userID)
 	} else {
 		log.Printf("[db] original URL not found: %s", original)
 	}
-	return key, found
+	return key, userID, found
 }
 
 func (s *CachedStore) ContainsKey(ctx context.Context, key string) bool {
