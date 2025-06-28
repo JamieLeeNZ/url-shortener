@@ -50,6 +50,12 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	db := s.urlStore
 
 	req, err := parseAndValidateURL(r)
@@ -60,14 +66,15 @@ func (s *Server) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	var key string
 
-	if k, found := db.GetKeyFromOriginal(ctx, req.Original); found {
+	if k, _, found := db.GetKeyFromOriginal(ctx, req.Original); found {
 		key = k
 	} else {
 		key = generateRandomKey(6)
 		for db.ContainsKey(ctx, key) {
 			key = generateRandomKey(6)
 		}
-		if err := db.Set(ctx, key, req.Original); err != nil {
+
+		if err := db.Set(ctx, key, req.Original, user.ID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -92,7 +99,7 @@ func (s *Server) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	original, ok := s.urlStore.GetOriginalFromKey(ctx, key)
+	original, _, ok := s.urlStore.GetOriginalFromKey(ctx, key)
 	if !ok {
 		http.Error(w, "invalid URL", http.StatusNotFound)
 		return

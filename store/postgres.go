@@ -36,32 +36,32 @@ func NewPostgresStore(connString string) (*PostgresStore, error) {
 var _ URLStore = (*PostgresStore)(nil)
 var _ UserStore = (*PostgresStore)(nil)
 
-func (s *PostgresStore) Set(ctx context.Context, key, originalURL string) error {
+func (s *PostgresStore) Set(ctx context.Context, key, originalURL string, userID string) error {
 	_, err := s.db.Exec(ctx, `
-		INSERT INTO url_mappings (key, original_url) VALUES ($1, $2)
+		INSERT INTO url_mappings (key, original_url, user_id) VALUES ($1, $2, $3)
 		ON CONFLICT (key) DO UPDATE SET original_url = EXCLUDED.original_url
-	`, key, originalURL)
+	`, key, originalURL, userID)
 	return err
 }
 
-func (s *PostgresStore) GetOriginalFromKey(ctx context.Context, key string) (string, bool) {
-	var original string
+func (s *PostgresStore) GetOriginalFromKey(ctx context.Context, key string) (string, string, bool) {
+	var original, userID string
 	err := s.db.QueryRow(ctx,
-		`SELECT original_url FROM url_mappings WHERE key = $1`, key).Scan(&original)
+		`SELECT original_url, user_id FROM url_mappings WHERE key = $1`, key).Scan(&original, &userID)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
-	return original, true
+	return original, userID, true
 }
 
-func (s *PostgresStore) GetKeyFromOriginal(ctx context.Context, original string) (string, bool) {
-	var key string
+func (s *PostgresStore) GetKeyFromOriginal(ctx context.Context, original string) (string, string, bool) {
+	var key, userID string
 	err := s.db.QueryRow(ctx,
-		`SELECT key FROM url_mappings WHERE original_url = $1`, original).Scan(&key)
+		`SELECT key, user_id FROM url_mappings WHERE original_url = $1`, original).Scan(&key, &userID)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
-	return key, true
+	return key, userID, true
 }
 
 func (s *PostgresStore) ContainsKey(ctx context.Context, key string) bool {
