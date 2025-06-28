@@ -128,3 +128,26 @@ func (s *PostgresStore) GetOrCreateUser(ctx context.Context, user models.User) (
 	user.CreatedAt = time.Now()
 	return user, nil
 }
+
+func (s *PostgresStore) GetURLsByUserID(ctx context.Context, userID string) ([]models.URLMapping, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT key, original_url, created_at
+		FROM url_mappings
+		WHERE user_id = $1
+		ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var urls []models.URLMapping
+	for rows.Next() {
+		var u models.URLMapping
+		if err := rows.Scan(&u.Key, &u.Original, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		urls = append(urls, u)
+	}
+
+	return urls, nil
+}

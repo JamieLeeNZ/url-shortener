@@ -69,6 +69,7 @@ func main() {
 	http.HandleFunc("/auth/google/callback", s.GoogleCallback)
 
 	http.HandleFunc("/me", s.RequireAuth(s.MeHandler))
+	http.HandleFunc("/links", s.RequireAuth(s.ListUserLinks))
 
 	http.HandleFunc("/logout", s.Logout)
 

@@ -175,3 +175,20 @@ func parseAndValidateURL(r *http.Request) (models.URLShortenRequest, error) {
 
 	return req, nil
 }
+
+func (s *Server) ListUserLinks(w http.ResponseWriter, r *http.Request) {
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := s.userStore.GetURLsByUserID(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, "Failed to fetch URLs", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
+}
