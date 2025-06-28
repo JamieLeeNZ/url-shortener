@@ -86,3 +86,118 @@ Read-Through:
 - If cache miss, read from PostgreSQL, store in Redis, and return.
 - Fast reads, but initial read may be slower due to cache miss.
 - Optimises reads without preloading everything.
+
+## 3. Session Management
+
+A session is a temporary stateful connection between a client (browser) and the server, maintained across multiple HTTP requests after the user logs in. Since HTTP is stateless, session management provides a way to "remember" the authenticated user between requests
+
+### Session Management Workflow:
+
+1. **User Logs In**: User submits credentials (username/password) to the server.
+2. **Server Validates Credentials**: The server checks the credentials against the database.
+3. **Session Creation**: If valid, the server creates a session:
+   - Generates a unique session ID (e.g., UUID).
+   - Stores session data (user ID, expiration time, etc.) in a session store (e.g., Redis).
+   - Sends the session ID to the client as a cookie.
+4. **Client Stores Session ID**: The client stores the session ID in a cookie.
+5. **Subsequent Requests**: For each request, the client sends the session ID cookie.
+6. **Server Validates Session**: The server retrieves the session data using the session
+7. **Session Expiration**: Sessions have an expiration time. After this time, the session is considered invalid (24 hours is common).
+8. **User Logs Out**: The user can log out, which invalidates the session
+
+### Cookies
+
+- Cookies store the session_id on the client side so it can be sent automatically with every HTTP request.
+- They are set by the server in the HTTP response headers and sent back by the client in subsequent requests:
+
+  `Set-Cookie: session_id=abc123; HttpOnly; Path=/; Expires=...`
+
+- On every request, the browser includes the cookie:
+
+  `Cookie: session_id=abc123`
+
+- Security Flags:
+  - HttpOnly: Prevents JavaScript access (XSS protection).
+  - Secure: Ensures the cookie is only sent over HTTPS.
+  - SameSite: Prevents CSRF (e.g., SameSite=Lax or Strict).
+- Expiration: Controlled by Expires or Max-Age attribute. Matches the session TTL (e.g., 24h).
+
+## 4. JWT Authentication
+
+JSON Web Tokens (JWT) are a compact, URL-safe means of representing claims to be transferred between two parties. They are widely used for stateless authentication in web and mobile applications.
+
+- A JWT is a self-contained token that includes encoded JSON data (claims) about the user or session.
+- It consists of three parts separated by dots: `header.payload.signature`:
+  - **Header**: Contains metadata about the token, such as the signing algorithm used (e.g., HS256).
+  - **Payload**: Contains the claims, which can include user information, roles, and expiration time.
+  - **Signature**: Used to verify that the sender of the JWT is who it claims to be and to ensure that the message wasn't changed along the way.
+
+### JWT Authentication Workflow:
+
+1. **User Logs In**: User submits credentials (username/password) to the server.
+2. **Server Validates Credentials**: The server checks the credentials against the database.
+3. **JWT Creation**: If valid, the server creates a JWT:
+   - Encodes user information and claims in the payload.
+   - Signs the token using a secret key or private key.
+4. **JWT Sent to Client**: The server sends the JWT back to the client, typically in the response body or as an HTTP-only cookie.
+5. **Client Stores JWT**: The client stores the JWT in its local storage or as an HTTP-only cookie.
+6. **Subsequent Requests**: For each request, the client sends the JWT in the `Authorization` header:
+   `Authorization: Bearer <token>`
+7. **Server Validates JWT**: The server verifies the JWT signature and checks claims (e.g., expiration time, issuer).
+8. **Access Granted**: If valid, the server processes the request and grants access to protected resources.
+9. **Token Expiration**: JWTs typically have an expiration time (e.g., 1 hour). After expiration, the client must reauthenticate to obtain a new token.
+10. **Token Refresh**: Optionally, a refresh token can be used to obtain a new JWT without requiring the user to log in again. The refresh token is usually stored securely and has a longer expiration time than the access token.
+
+### Redis Sessions vs. JWT Authentication:
+
+| Feature     | Redis Authentication                                                                              | JWT Authentication                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Storage     | Session data stored in Redis (server-side)                                                        | Token stored on client (stateless)                                                      |
+| Scalability | Requires shared or replicated Redis                                                               | Easy to scale horizontally since no server-side storage needed                          |
+| Performance | Fast access to session data, but requires Redis connection and Redis query for every request      | Fast verification (locally), no database access needed for each request                 |
+| Expiration  | Managed by Redis (TTL)                                                                            | Managed by JWT claims (e.g., `exp` field)                                               |
+| Token Size  | Small cookie with session ID                                                                      | Larger token carrying user claims                                                       |
+| Security    | Session ID is opaque and stored server-side                                                       | JWT payload is visible (not encrypted by default), must verify signatures               |
+| Complexity  | More complex setup with Redis and session management                                              | Simpler token-based authentication, no session store required                           |
+| Revocation  | Can invalidate sessions by deleting from Redis                                                    | Harder to revoke; requires token blacklist or short expiration                          |
+| Use Cases   | Best for applications with frequent user interactions and need for server-side session management | Best for stateless APIs, mobile apps, and microservices where scalability is a priority |
+
+Redis sessions are suitable when easy and immediate session revocation is required, session state needs to be stored on the server, maintaining server-side state is acceptable, and tighter control over security is desired.
+
+JWT is appropriate when stateless authentication is preferred, scalability across multiple services is needed, token revocation before expiry is not a primary concern, and security relies heavily on token signing and client-side handling.
+
+## 5. Middleware
+
+Middleware is a layer in the web server architecture that sits between incoming HTTP requests and the final request handlers. It acts as a gatekeeper (by protecting routes), intercepting requests, performing tasks like authentication, logging, and error handling, and then passing the request to the appropriate handler.
+
+### Authentication Middleware:
+
+Authentication middleware is a type of middleware that handles user authentication.
+
+- **Check Authentication**: It checks if the user is authenticated by verifying the session or JWT token.
+- **Protect Routes**: It protects specific routes by allowing access only to authenticated users.
+- **Redirect or Respond**: If the user is not authenticated, it can redirect them to the login page or respond with an error (e.g., 401 Unauthorized).
+- **Inject User Context**: If authenticated, it can inject user information into the request context for use by subsequent handlers.
+
+### Example Middleware Implementation:
+
+```go
+func AuthMiddleware(next http.Handler) http.Handler {
+  return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    // Check if user is authenticated (e.g., check session or JWT)
+    user, err := GetAuthenticatedUser(r)
+    if err != nil {
+      // If not authenticated, respond with 401 Unauthorized
+      http.Error(w, "Unauthorized", http.StatusUnauthorized)
+      return
+    }
+
+    // Inject user into request context
+    ctx := context.WithValue(r.Context(), "user", user)
+    r = r.WithContext(ctx)
+
+    // Call the next handler
+    next.ServeHTTP(w, r)
+  })
+}
+```
