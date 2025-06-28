@@ -71,13 +71,13 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			s.CreateHandler(w, r)
+			s.RequireAuth(s.CreateHandler)(w, r)
 		case http.MethodGet:
 			s.GetHandler(w, r)
 		case http.MethodPut:
-			s.UpdateHandler(w, r)
+			s.RequireAuth(s.UpdateHandler)(w, r)
 		case http.MethodDelete:
-			s.DeleteHandler(w, r)
+			s.RequireAuth(s.DeleteHandler)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
