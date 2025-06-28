@@ -68,6 +68,10 @@ func main() {
 	http.HandleFunc("/login", s.GoogleLogin)
 	http.HandleFunc("/auth/google/callback", s.GoogleCallback)
 
+	http.HandleFunc("/me", s.RequireAuth(s.MeHandler))
+
+	http.HandleFunc("/logout", s.Logout)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:

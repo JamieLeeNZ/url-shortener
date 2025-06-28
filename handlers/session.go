@@ -86,6 +86,15 @@ func GetCurrentUser(r *http.Request) *models.User {
 	return user
 }
 
+func (s *Server) MeHandler(w http.ResponseWriter, r *http.Request) {
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
+}
+
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
