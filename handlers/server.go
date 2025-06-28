@@ -116,6 +116,12 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
@@ -125,6 +131,12 @@ func (s *Server) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := parseAndValidateURL(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, existingUserID, found := s.urlStore.GetKeyFromOriginal(ctx, req.Original)
+	if found && existingUserID != user.ID {
+		http.Error(w, "forbidden: you do not own this URL", http.StatusForbidden)
 		return
 	}
 
@@ -146,14 +158,24 @@ func (s *Server) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	key := strings.TrimPrefix(r.URL.Path, "/")
 	if key == "" {
 		http.Error(w, "URI key is required", http.StatusBadRequest)
 		return
 	}
 
-	if !s.urlStore.ContainsKey(ctx, key) {
-		http.Error(w, "invalid URL", http.StatusNotFound)
+	_, existingUserID, found := s.urlStore.GetOriginalFromKey(ctx, key)
+	if !found {
+		http.Error(w, "URL not found", http.StatusNotFound)
+		return
+	} else if existingUserID != user.ID {
+		http.Error(w, "forbidden: you do not own this URL", http.StatusForbidden)
 		return
 	}
 
